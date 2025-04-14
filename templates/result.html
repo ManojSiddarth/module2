@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dental Image Classification Result</title>
+</head>
+<body>
+  <h1>Hello {{ username }}!</h1>
+  <h2>Classification Result:</h2>
+  <pre>{{ output }}</pre>
+
+  <h3>Processed Image:</h3>
+  <!-- <img src="{{ image_path }}" alt="Processed Image" style="max-width: 400px;"> -->
+  <img src="{{ url_for('static', filename='output/' + username + '.jpg') }}" alt="Processed Image" style="max-width: 400px;">
+
+  
+  <br><a href="/">Go Back to Home</a>
+</body>
+</html>
