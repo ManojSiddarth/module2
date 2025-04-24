@@ -30,6 +30,10 @@ def process_images():
         print(f"Classifying and saving results for {safe_username}...")
         subprocess.run(["python", "classifier.py", identity], check=True)
 
+        # Step 4: Compare biometric data using subprocess
+        print(f"Comparing biometric data for {safe_username}...")
+        result = subprocess.check_output(["python", "biometric.py", identity]).decode()
+
         # Render the result page after processing is done
         return render_template(
             "result.html",
