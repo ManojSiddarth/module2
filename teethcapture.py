@@ -1,56 +1,53 @@
 import cv2
-import numpy as np
+import os
 
-def capture_image():
-    # Open a connection to the default camera (0 for built-in webcam)
+def capture_teeth_image():
     cap = cv2.VideoCapture(0)
-
     if not cap.isOpened():
         print("Error: Could not open the camera.")
         return
 
-    print("Press the spacebar to capture an image of the teeth.")
+    print("Align your teeth within the box and press the spacebar to capture.")
     print("Press 'q' to quit without capturing.")
 
     while True:
-        # Capture frame-by-frame
         ret, frame = cap.read()
         if not ret:
             print("Error: Failed to capture image.")
             break
 
-        # Mirror the frame (flip horizontally)
         frame = cv2.flip(frame, 1)
-
-        # Get frame dimensions
         h, w, _ = frame.shape
 
-        # Zoom: Crop center and resize (2x zoom)
-        zoom_factor = 2
-        new_w, new_h = w // zoom_factor, h // zoom_factor
-        start_x, start_y = (w - new_w) // 2, (h - new_h) // 2
-        cropped = frame[start_y:start_y+new_h, start_x:start_x+new_w]
-        zoomed_frame = cv2.resize(cropped, (w, h), interpolation=cv2.INTER_LINEAR)
+        # Define center ROI box where mouth should be
+        box_w, box_h = w // 3, h // 4
+        start_x, start_y = (w - box_w) // 2, (h - box_h) // 2
+        end_x, end_y = start_x + box_w, start_y + box_h
 
-        # Display the resulting frame
-        cv2.imshow('Camera - Press Spacebar to Capture', zoomed_frame)
+        # Draw guide box
+        frame_with_box = frame.copy()
+        cv2.rectangle(frame_with_box, (start_x, start_y), (end_x, end_y), (0, 255, 0), 2)
+        cv2.putText(frame_with_box, 'Place teeth here', (start_x, start_y - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
 
-        # Wait for key press
+        cv2.imshow('Align Teeth and Press Spacebar', frame_with_box)
+
         key = cv2.waitKey(1) & 0xFF
 
-        if key == ord(' '):  # Spacebar key
-            # Save the mirrored & zoomed image
-            image_path = '.\pictures\captured_teeth_image.jpg'
-            cv2.imwrite(image_path, zoomed_frame)
-            print(f"Image captured and saved as {image_path}")
+        if key == ord(' '):  # Spacebar
+            roi = frame[start_y:end_y, start_x:end_x]
+            output_dir = './pictures'
+            os.makedirs(output_dir, exist_ok=True)
+            image_path = os.path.join(output_dir, 'captured_teeth_image.jpg')
+            cv2.imwrite(image_path, roi)
+            print(f"Image captured and saved at {image_path}")
             break
-        elif key == ord('q'):  # 'q' key to quit
+        elif key == ord('q'):  # Quit
             print("Exiting without capturing an image.")
             break
 
-    # Release the camera and close all OpenCV windows
     cap.release()
     cv2.destroyAllWindows()
 
 if __name__ == "__main__":
-    capture_image()
+    capture_teeth_image()
