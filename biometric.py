@@ -8,10 +8,10 @@ import torchvision.transforms as transforms
 import torch.nn as nn
 import torch.nn.functional as F
 
-# Step 1: Load YOLO model for tooth detection
+# Load YOLO model for tooth detection
 yolo_model = YOLO('DentalModel1.pt')
 
-# Step 2: Load or define the classifier model (CNN)
+# Define the SimpleToothCNN for feature extraction (same as before)
 class SimpleToothCNN(nn.Module):
     def __init__(self):
         super(SimpleToothCNN, self).__init__()
@@ -27,47 +27,87 @@ class SimpleToothCNN(nn.Module):
         x = F.relu(self.fc1(x))  # feature vector
         return x
 
+# Initialize the model
 feature_model = SimpleToothCNN()
 feature_model.eval()
 
-# Step 3: Define transform for cropped tooth images
+# Define the transform for cropped tooth images
 transform = transforms.Compose([
     transforms.ToPILImage(),
     transforms.Resize((64, 64)),
     transforms.ToTensor(),
 ])
 
-# Step 4: Run YOLO on the input image
-image_path = './pictures/enhanced_teeth_image.jpg'
-results = yolo_model(image_path)
-result = results[0]
-boxes = result.boxes.xywh.cpu().numpy()
+# Function to extract features from a single image
+def extract_features(image_path):
+    # Run YOLO on the input image
+    results = yolo_model(image_path)
+    result = results[0]
+    boxes = result.boxes.xywh.cpu().numpy()
 
-# Load image
-image = cv2.imread(image_path)
-h, w, _ = image.shape
+    # Load image
+    image = cv2.imread(image_path)
+    h, w, _ = image.shape
 
-features = []
+    features = []
+    for i, (cx, cy, bw, bh) in enumerate(boxes):
+        x1 = int(max(cx - bw / 2, 0))
+        y1 = int(max(cy - bh / 2, 0))
+        x2 = int(min(cx + bw / 2, w))
+        y2 = int(min(cy + bh / 2, h))
+        crop = image[y1:y2, x1:x2]
 
-for i, (cx, cy, bw, bh) in enumerate(boxes):
-    x1 = int(max(cx - bw / 2, 0))
-    y1 = int(max(cy - bh / 2, 0))
-    x2 = int(min(cx + bw / 2, w))
-    y2 = int(min(cy + bh / 2, h))
-    crop = image[y1:y2, x1:x2]
+        if crop.size == 0:
+            continue
 
-    if crop.size == 0:
-        continue
+        crop_tensor = transform(crop).unsqueeze(0)
+        with torch.no_grad():
+            feature_vec = feature_model(crop_tensor).squeeze().numpy()
+        features.append(feature_vec)
 
-    crop_tensor = transform(crop).unsqueeze(0)
-    with torch.no_grad():
-        feature_vec = feature_model(crop_tensor).squeeze().numpy()
-    features.append(feature_vec)
+    return features
 
-# Step 5: Save feature set for this identity
-identity = sys.argv[1] if len(sys.argv) > 1 else 'default_user'
-feature_save_path = f'./features/{identity}_features.npy'
-os.makedirs('./features', exist_ok=True)
-np.save(feature_save_path, features)
+# Function to compare features
+def compare_features(stored_features, extracted_features):
+    # Compute the Euclidean distance between stored features and extracted features
+    distances = []
+    for stored in stored_features:
+        for extracted in extracted_features:
+            distance = np.linalg.norm(stored - extracted)
+            distances.append(distance)
 
-print(f"Feature vectors saved for identity: {identity}")
+    # Determine if the minimum distance is below a threshold
+    min_distance = min(distances)
+    threshold = 0.65  # You can adjust this threshold
+    if min_distance < threshold:
+        return True, min_distance
+    else:
+        return False, min_distance
+
+# Main function to compare stored features with extracted features
+def compare_biometrics(image_path, identity):
+    # Load the stored features for the identity
+    feature_save_path = f'./features/{identity}_features.npy'
+    if not os.path.exists(feature_save_path):
+        print("No stored features found for this user.")
+        return "No Match Found"
+
+    stored_features = np.load(feature_save_path)
+
+    # Extract features from the input image
+    extracted_features = extract_features(image_path)
+
+    # Compare features and check if there is a match
+    match_found, distance = compare_features(stored_features, extracted_features)
+    
+    if match_found:
+        return f"Match Found (Distance: {distance})"
+    else:
+        return f"No Match Found (Distance: {distance})"
+
+# Run the comparison (This will be triggered from the command line with image path and identity)
+if __name__ == "__main__":
+    image_path = sys.argv[1]  # Path to captured image
+    identity = sys.argv[2]  # Identity to verify
+    match_result = compare_biometrics(image_path, identity)
+    print(match_result)

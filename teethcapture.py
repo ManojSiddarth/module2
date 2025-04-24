@@ -35,11 +35,11 @@ def capture_teeth_image():
         key = cv2.waitKey(1) & 0xFF
 
         if key == ord(' '):  # Spacebar
-            roi = frame[start_y:end_y, start_x:end_x]
+            # Capture the entire frame
             output_dir = './pictures'
             os.makedirs(output_dir, exist_ok=True)
             image_path = os.path.join(output_dir, 'captured_teeth_image.jpg')
-            cv2.imwrite(image_path, roi)
+            cv2.imwrite(image_path, frame)  # Save the entire frame
             print(f"Image captured and saved at {image_path}")
             break
         elif key == ord('q'):  # Quit
